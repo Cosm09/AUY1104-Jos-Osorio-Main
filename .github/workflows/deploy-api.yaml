@@ -123,3 +123,12 @@ jobs:
 
       - name: Verificar pods
         run: ssh -o StrictHostKeyChecking=accept-new "ubuntu@${{ inputs.k3s-server-public-ip }}" 'sudo k3s kubectl get pods -o wide'
+      - name: Monitorear Despliegue (Rollout Status)
+        id: deploy
+        run: ssh -o StrictHostKeyChecking=accept-new "ubuntu@${{ inputs.k3s-server-public-ip }}" 'sudo k3s kubectl rollout status deployment/demo-api --timeout=60s'
+
+      - name: Rollback automático
+        if: failure()
+        run: |
+          echo "⚠️ Despliegue fallido o excedió el tiempo límite. Ejecutando Rollback..."
+          ssh -o StrictHostKeyChecking=accept-new "ubuntu@${{ inputs.k3s-server-public-ip }}" 'sudo k3s kubectl rollout undo deployment/demo-api && sudo k3s kubectl rollout status deployment/demo-api --timeout=60s'
