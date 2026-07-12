@@ -7,19 +7,16 @@ name: Subir la API a Docker Hub (receta reutilizable)
 
 on:
   # Los repos cliente pasan la IP K3S como input (no hay acceso a vars del caller desde aquí).
-  # Ejemplo en el cliente:
-  # with:
-  #   k3s-server-public-ip: ${{ vars.K3S_SERVER_PUBLIC_IP }}
-  #
+  # Ejemplo en el cliente: with: k3s-server-public-ip: ${{ vars.K3S_SERVER_PUBLIC_IP }}
   # Cuando otro repo te “llama” y te pasa nombre de imagen, tag y secretos
   workflow_call:
     inputs:
       image-name:
-        description: 'Cómo se llamará la imagen en Docker Hub (solo el nombre, sin tu usuario)'
+        description: Cómo se llamará la imagen en Docker Hub (solo el nombre, sin tu usuario)
         required: true
         type: string
       image-tag:
-        description: 'Etiqueta que identifica esta versión (por ejemplo el identificador del commit)'
+        description: Etiqueta que identifica esta versión (por ejemplo el identificador del commit)
         required: true
         type: string
       k3s-server-public-ip:
@@ -40,15 +37,15 @@ on:
   workflow_dispatch:
     inputs:
       image-name:
-        description: 'Nombre corto de la imagen (ej. mi-api-academica)'
+        description: Nombre corto de la imagen (ej. mi-api-academica)
         required: true
         type: string
       image-tag:
-        description: 'Etiqueta de esta versión (ej. v1.0.0)'
+        description: Etiqueta de esta versión (ej. v1.0.0)
         required: true
         type: string
       k3s-server-public-ip:
-        description: 'IP pública del servidor K3S (si corres este workflow aquí, pulsa el valor; vía workflow_call suele inyectarse desde vars)'
+        description: IP pública del servidor K3S
         required: true
         type: string
 
@@ -65,7 +62,7 @@ jobs:
         run: npm install
 
       - name: 3 · Ejecutar tests
-        run: npm test 
+        run: npm test
 
   # Etapa 2 · Solo corre si la etapa anterior terminó bien
   build-and-push:
@@ -121,17 +118,21 @@ jobs:
           test -d k8s || { echo "::error::Falta carpeta k8s/ en la raíz del repo"; exit 1; }
           ssh -o StrictHostKeyChecking=accept-new "ubuntu@${{ inputs.k3s-server-public-ip }}" 'sudo rm -rf /tmp/k8s-deploy'
           scp -o StrictHostKeyChecking=accept-new -r k8s "ubuntu@${{ inputs.k3s-server-public-ip }}:/tmp/k8s-deploy"
-          ssh -o StrictHostKeyChecking=accept-new "ubuntu@${{ inputs.k3s-server-public-ip }}" 'sudo k3s kubectl apply -f /tmp/k8s-deploy/'
+          ssh -o StrictHostKeyChecking=accept-new "ubuntu@${{ inputs.k3s-server-public-ip }}" \
+            'sudo k3s kubectl apply -f /tmp/k8s-deploy/'
 
       - name: Verificar pods
         run: ssh -o StrictHostKeyChecking=accept-new "ubuntu@${{ inputs.k3s-server-public-ip }}" 'sudo k3s kubectl get pods -o wide'
 
       - name: Monitorear Despliegue (Rollout Status)
         id: deploy
-        run: ssh -o StrictHostKeyChecking=accept-new "ubuntu@${{ inputs.k3s-server-public-ip }}" 'sudo k3s kubectl rollout status deployment/demo-api --timeout=60s'
+        run: |
+          ssh -o StrictHostKeyChecking=accept-new "ubuntu@${{ inputs.k3s-server-public-ip }}" \
+            'sudo k3s kubectl rollout status deployment/demo-api --timeout=60s'
 
       - name: Rollback automático
         if: failure()
         run: |
           echo "⚠️ Despliegue fallido o excedió el tiempo límite. Ejecutando Rollback..."
-          ssh -o StrictHostKeyChecking=accept-new "ubuntu@${{ inputs.k3s-server-public-ip }}" 'sudo k3s kubectl rollout undo deployment/demo-api && sudo k3s kubectl rollout status deployment/demo-api --timeout=60s'
+          ssh -o StrictHostKeyChecking=accept-new "ubuntu@${{ inputs.k3s-server-public-ip }}" \
+            'sudo k3s kubectl rollout undo deployment/demo-api && sudo k3s kubectl rollout status deployment/demo-api --timeout=60s'
